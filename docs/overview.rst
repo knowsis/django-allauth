@@ -41,11 +41,15 @@ Supported Providers
 
 - Bitly (OAuth2)
 
-- Dropbox (OAuth)
+- Dropbox (OAuth, OAuth2)
+
+- Evernote (OAuth)
 
 - Facebook (both OAuth2 and JS SDK)
 
 - Feedly (OAuth2)
+
+- Firefox Accounts (OAuth2)
 
 - Flickr (OAuth)
 
@@ -70,6 +74,8 @@ Supported Providers
 - Persona
 
 - SoundCloud (OAuth2)
+
+- Spotify (OAuth2)
 
 - Stack Exchange (OAuth2)
 

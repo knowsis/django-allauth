@@ -3,6 +3,31 @@ Changelog
 
 This chapter contains notes on upgrading.
 
+
+From 0.18.0
+***********
+
+- In the upcoming Django 1.8 it is no longer possible to hookup an
+  unsaved `User` instance to a `SocialAccount`. Therefore, if you are
+  inspecting the `sociallogin` object, you should now use
+  `sociallogin.user` instead of `sociallogin.account.user`.
+
+- When users logged in while `User.is_active` was `False`, they were
+  sent to `/accounts/inactive/` in case of a social login, and
+  received a form validation error in case of a local login. This
+  needless inconsistency has been removed. The validation error no
+  longer appears and local logins are also redirected to
+  `/accounts/inactive/`.
+
+- In case you were overriding the `ResetPasswordForm`: the save method
+  now takes `request` as its first argument.
+
+- All existing migrations have been moved into `south_migrations`
+  packages, this in order not to conflict with Django's built-in
+  support for migrations. South 1.0 automatically picks up this new
+  location. Upgrade South if you are still dependent on these
+  migrations.
+
 From 0.17.0
 ***********
 

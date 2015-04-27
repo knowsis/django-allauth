@@ -20,9 +20,8 @@ from allauth.utils import get_user_model
 
 from . import app_settings
 
+from .auth_backends import AuthenticationBackend
 from .adapter import get_adapter
-
-User = get_user_model()
 
 
 @override_settings(
@@ -47,7 +46,7 @@ class AccountTests(TestCase):
         ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod
         .USERNAME_EMAIL)
     def test_username_containing_at(self):
-        user = User.objects.create(username='@raymond.penners')
+        user = get_user_model().objects.create(username='@raymond.penners')
         user.set_password('psst')
         user.save()
         EmailAddress.objects.create(user=user,
@@ -73,7 +72,7 @@ class AccountTests(TestCase):
     def test_signup_other_email_verified_externally(self):
         """
         John is invited on john@work.com, but signs up via john@home.com.
-        E-mail verification is by-passed, his home e-mail address is
+        E-mail verification is by-passed, their home e-mail address is
         used as a secondary.
         """
         user = self._test_signup_email_verified_externally('john@home.com',
@@ -110,11 +109,10 @@ class AccountTests(TestCase):
         self.assertEqual(resp['location'],
                          get_adapter().get_login_redirect_url(request))
         self.assertEqual(len(mail.outbox), 0)
-        return User.objects.get(username=username)
+        return get_user_model().objects.get(username=username)
 
     def _create_user_and_login(self):
-        user = User.objects.create(username='john',
-                                   is_active=True)
+        user = get_user_model().objects.create(username='john', is_active=True)
         user.set_password('doe')
         user.save()
         self.client.login(username='john', password='doe')
@@ -157,8 +155,6 @@ class AccountTests(TestCase):
         resp = c.get(reverse(urlname))
         return resp
 
-    @override_settings(
-        ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod.USERNAME)
     def test_password_forgotten_username_hint(self):
         self._request_new_password()
         body = mail.outbox[0].body
@@ -172,9 +168,8 @@ class AccountTests(TestCase):
         assert 'username' not in body
 
     def _request_new_password(self):
-        user = User.objects.create(username='john',
-                                   email='john@doe.org',
-                                   is_active=True)
+        user = get_user_model().objects.create(
+            username='john', email='john@doe.org', is_active=True)
         user.set_password('doe')
         user.save()
         self.client.post(
@@ -184,19 +179,57 @@ class AccountTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ['john@doe.org'])
         return user
 
-    def test_password_forgotten_url_protocol(self):
+    def test_password_reset_flow(self):
+        """
+        Tests the password reset flow: requesting a new password,
+        receiving the reset link via email and finally resetting the
+        password to a new value.
+        """
+        # Request new password
         user = self._request_new_password()
         body = mail.outbox[0].body
         self.assertGreater(body.find('https://'), 0)
+
+        # Extract URL for `password_reset_from_key` view and access it
         url = body[body.find('/password/reset/'):].split()[0]
         resp = self.client.get(url)
         self.assertTemplateUsed(resp, 'account/password_reset_from_key.html')
-        self.client.post(url,
-                         {'password1': 'newpass123',
-                          'password2': 'newpass123'})
-        user = User.objects.get(pk=user.pk)
+        self.assertFalse('token_fail' in resp.context_data)
+
+        # Reset the password
+        resp = self.client.post(url,
+                                {'password1': 'newpass123',
+                                 'password2': 'newpass123'})
+        self.assertRedirects(resp, reverse('account_reset_password_from_key_done'))
+
+        # Check the new password is in effect
+        user = get_user_model().objects.get(pk=user.pk)
         self.assertTrue(user.check_password('newpass123'))
-        return resp
+
+        # Trying to reset the password against the same URL (or any other
+        # invalid/obsolete URL) returns a bad token response
+        resp = self.client.post(url,
+                                {'password1': 'newpass123',
+                                 'password2': 'newpass123'})
+        self.assertTemplateUsed(resp, 'account/password_reset_from_key.html')
+        self.assertTrue(resp.context_data['token_fail'])
+
+        # Same should happen when accessing the page directly
+        response = self.client.get(url)
+        self.assertTemplateUsed(response, 'account/password_reset_from_key.html')
+        self.assertTrue(response.context_data['token_fail'])
+
+        # When in XHR views, it should respond with a 400 bad request
+        # code, and the response body should contain the JSON-encoded
+        # error from the adapter
+        response = self.client.post(url,
+                                    {'password1': 'newpass123',
+                                     'password2': 'newpass123'},
+                                    HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.content.decode('utf8'))
+        self.assertTrue('form_errors' in data)
+        self.assertTrue('__all__' in data['form_errors'])
 
     def test_email_verification_mandatory(self):
         c = Client()
@@ -209,6 +242,7 @@ class AccountTests(TestCase):
                       follow=True)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(mail.outbox[0].to, ['john@doe.com'])
+        self.assertGreater(mail.outbox[0].body.find('https://'), 0)
         self.assertEqual(len(mail.outbox), 1)
         self.assertTemplateUsed(resp,
                                 'account/verification_sent.html')
@@ -221,17 +255,18 @@ class AccountTests(TestCase):
             # is_active is controlled by the admin to manually disable
             # users. I don't want this flag to flip automatically whenever
             # users verify their email adresses.
-            self.assertTrue(User.objects.filter(username='johndoe',
-                                                is_active=True).exists())
+            self.assertTrue(get_user_model().objects.filter(
+                username='johndoe', is_active=True).exists())
+
             self.assertTemplateUsed(resp,
                                     'account/verification_sent.html')
             # Attempt 1: no mail is sent due to cool-down ,
             # but there was already a mail in the outbox.
             self.assertEqual(len(mail.outbox), attempt)
-            self.assertEqual(EmailConfirmation.objects
-                             .filter(email_address__email=
-                                     'john@doe.com').count(),
-                             attempt)
+            self.assertEqual(
+                EmailConfirmation.objects.filter(
+                    email_address__email='john@doe.com').count(),
+                attempt)
             # Wait for cooldown
             EmailConfirmation.objects.update(sent=now()
                                              - timedelta(days=1))
@@ -255,33 +290,104 @@ class AccountTests(TestCase):
         site = Site.objects.get_current()
         site.name = '<enc&"test>'
         site.save()
-        u = User.objects.create(username='test',
-                                email='foo@bar.com')
+        u = get_user_model().objects.create(
+            username='test',
+            email='foo@bar.com')
         request = RequestFactory().get('/')
         EmailAddress.objects.add_email(request, u, u.email, confirm=True)
         self.assertTrue(mail.outbox[0].subject[1:].startswith(site.name))
 
-    def test_login_view(self):
-        c = Client()
-        c.get(reverse('account_login'))
-        # TODO: Actually test something
+    @override_settings(
+        ACCOUNT_EMAIL_VERIFICATION=app_settings.EmailVerificationMethod
+        .OPTIONAL)
+    def test_login_unverified_account_optional(self):
+        """Tests login behavior when email verification is optional."""
+        user = get_user_model().objects.create(username='john')
+        user.set_password('doe')
+        user.save()
+        EmailAddress.objects.create(user=user,
+                                    email='john@example.com',
+                                    primary=True,
+                                    verified=False)
+        resp = self.client.post(reverse('account_login'),
+                                {'login': 'john',
+                                 'password': 'doe'})
+        self.assertEqual(resp['location'],
+                         'http://testserver'+settings.LOGIN_REDIRECT_URL)
+
+    def test_login_unverified_account_mandatory(self):
+        """Tests login behavior when email verification is mandatory."""
+        user = get_user_model().objects.create(username='john')
+        user.set_password('doe')
+        user.save()
+        EmailAddress.objects.create(user=user,
+                                    email='john@example.com',
+                                    primary=True,
+                                    verified=False)
+        resp = self.client.post(reverse('account_login'),
+                                {'login': 'john',
+                                 'password': 'doe'})
+        self.assertRedirects(resp, reverse('account_email_verification_sent'))
+        self.assertEqual(resp['location'],
+                         'http://testserver' + reverse('account_email_verification_sent'))
+
+    def test_login_inactive_account(self):
+        """
+        Tests login behavior with inactive accounts.
+
+        Inactive user accounts should be prevented from performing any actions,
+        regardless of their verified state.
+        """
+        # Inactive and verified user account
+        user = get_user_model().objects.create(username='john', is_active=False)
+        user.set_password('doe')
+        user.save()
+        EmailAddress.objects.create(user=user,
+                                    email='john@example.com',
+                                    primary=True,
+                                    verified=True)
+        resp = self.client.post(reverse('account_login'),
+                                {'login': 'john',
+                                 'password': 'doe'})
+        self.assertRedirects(resp, reverse('account_inactive'))
+
+        # Inactive and unverified user account
+        user = get_user_model().objects.create(username='doe', is_active=False)
+        user.set_password('john')
+        user.save()
+        EmailAddress.objects.create(user=user,
+                                    email='doe@example.com',
+                                    primary=True,
+                                    verified=False)
+        resp = self.client.post(reverse('account_login'),
+                                {'login': 'doe',
+                                 'password': 'john'})
+        self.assertRedirects(resp, reverse('account_inactive'))
+
+    def test_ajax_password_reset(self):
+        get_user_model().objects.create(
+            username='john', email='john@doe.org', is_active=True)
+        resp = self.client.post(
+            reverse('account_reset_password'),
+            data={'email': 'john@doe.org'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['john@doe.org'])
+        self.assertEqual(resp['content-type'], 'application/json')
 
     def test_ajax_login_fail(self):
         resp = self.client.post(reverse('account_login'),
                                 {},
                                 HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         self.assertEqual(resp.status_code, 400)
-        data = json.loads(resp.content.decode('utf8'))
+        json.loads(resp.content.decode('utf8'))
         # TODO: Actually test something
 
     @override_settings(
         ACCOUNT_EMAIL_VERIFICATION=app_settings.EmailVerificationMethod
-        .OPTIONAL,
-        ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod
-        .USERNAME)
+        .OPTIONAL)
     def test_ajax_login_success(self):
-        user = User.objects.create(username='john',
-                                   is_active=True)
+        user = get_user_model().objects.create(username='john', is_active=True)
         user.set_password('doe')
         user.save()
         resp = self.client.post(reverse('account_login'),
@@ -311,8 +417,7 @@ class AccountTests(TestCase):
 
     def _logout_view(self, method):
         c = Client()
-        user = User.objects.create(username='john',
-                                   is_active=True)
+        user = get_user_model().objects.create(username='john', is_active=True)
         user.set_password('doe')
         user.save()
         c = Client()
@@ -354,6 +459,133 @@ class AccountTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
 
 
+class EmailFormTests(TestCase):
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create(username='john',
+                                        email='john1@doe.org')
+        self.user.set_password('doe')
+        self.user.save()
+        self.email_address = EmailAddress.objects.create(
+            user=self.user,
+            email=self.user.email,
+            verified=True,
+            primary=True)
+        self.email_address2 = EmailAddress.objects.create(
+            user=self.user,
+            email='john2@doe.org',
+            verified=False,
+            primary=False)
+        self.client.login(username='john', password='doe')
+
+    def test_add(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_add': '',
+             'email': 'john3@doe.org'})
+        EmailAddress.objects.get(
+            email='john3@doe.org',
+            user=self.user,
+            verified=False,
+            primary=False)
+        self.assertTemplateUsed(resp,
+                                'account/messages/email_confirmation_sent.txt')
+
+    def test_ajax_add(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_add': '',
+             'email': 'john3@doe.org'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        data = json.loads(resp.content.decode('utf8'))
+        self.assertEqual(data['location'],
+                         reverse('account_email'))
+
+    def test_ajax_add_invalid(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_add': '',
+             'email': 'john3#doe.org'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        data = json.loads(resp.content.decode('utf8'))
+        self.assertTrue('form_errors' in data)
+        self.assertTrue('email' in data['form_errors'])
+
+    def test_remove_primary(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_remove': '',
+             'email': self.email_address.email})
+        EmailAddress.objects.get(pk=self.email_address.pk)
+        self.assertTemplateUsed(
+            resp,
+            'account/messages/cannot_delete_primary_email.txt')
+
+    def test_ajax_remove_primary(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_remove': '',
+             'email': self.email_address.email},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertTemplateUsed(
+            resp,
+            'account/messages/cannot_delete_primary_email.txt')
+        data = json.loads(resp.content.decode('utf8'))
+        self.assertEqual(data['location'],
+                         reverse('account_email'))
+
+    def test_remove_secondary(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_remove': '',
+             'email': self.email_address2.email})
+        self.assertRaises(EmailAddress.DoesNotExist,
+                          lambda: EmailAddress.objects.get(
+                              pk=self.email_address2.pk))
+        self.assertTemplateUsed(
+            resp,
+            'account/messages/email_deleted.txt')
+
+    def test_set_primary_unverified(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_primary': '',
+             'email': self.email_address2.email})
+        email_address = EmailAddress.objects.get(pk=self.email_address.pk)
+        email_address2 = EmailAddress.objects.get(pk=self.email_address2.pk)
+        self.assertFalse(email_address2.primary)
+        self.assertTrue(email_address.primary)
+        self.assertTemplateUsed(
+            resp,
+            'account/messages/unverified_primary_email.txt')
+
+    def test_set_primary(self):
+        email_address2 = EmailAddress.objects.get(pk=self.email_address2.pk)
+        email_address2.verified = True
+        email_address2.save()
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_primary': '',
+             'email': self.email_address2.email})
+        email_address = EmailAddress.objects.get(pk=self.email_address.pk)
+        email_address2 = EmailAddress.objects.get(pk=self.email_address2.pk)
+        self.assertFalse(email_address.primary)
+        self.assertTrue(email_address2.primary)
+        self.assertTemplateUsed(
+            resp,
+            'account/messages/primary_email_set.txt')
+
+    def test_verify(self):
+        resp = self.client.post(
+            reverse('account_email'),
+            {'action_send': '',
+             'email': self.email_address2.email})
+        self.assertTemplateUsed(
+            resp,
+            'account/messages/email_confirmation_sent.txt')
+
+
 class BaseSignupFormTests(TestCase):
 
     @override_settings(
@@ -377,3 +609,64 @@ class BaseSignupFormTests(TestCase):
         }
         form = BaseSignupForm(data, email_required=True)
         self.assertTrue(form.is_valid())
+
+
+
+class AuthenticationBackendTests(TestCase):
+
+    def setUp(self):
+        user = get_user_model().objects.create(
+            is_active=True,
+            email='john@doe.com',
+            username='john')
+        user.set_password(user.username)
+        user.save()
+        self.user = user
+
+    @override_settings(
+        ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod.USERNAME)  # noqa
+    def test_auth_by_username(self):
+        user = self.user
+        backend = AuthenticationBackend()
+        self.assertEqual(
+            backend.authenticate(
+                username=user.username,
+                password=user.username).pk,
+            user.pk)
+        self.assertEqual(
+            backend.authenticate(
+                username=user.email,
+                password=user.username),
+            None)
+
+    @override_settings(
+        ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod.EMAIL)  # noqa
+    def test_auth_by_email(self):
+        user = self.user
+        backend = AuthenticationBackend()
+        self.assertEqual(
+            backend.authenticate(
+                username=user.email,
+                password=user.username).pk,
+            user.pk)
+        self.assertEqual(
+            backend.authenticate(
+                username=user.username,
+                password=user.username),
+            None)
+
+    @override_settings(
+        ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod.USERNAME_EMAIL)  # noqa
+    def test_auth_by_username_or_email(self):
+        user = self.user
+        backend = AuthenticationBackend()
+        self.assertEqual(
+            backend.authenticate(
+                username=user.email,
+                password=user.username).pk,
+            user.pk)
+        self.assertEqual(
+            backend.authenticate(
+                username=user.username,
+                password=user.username).pk,
+            user.pk)

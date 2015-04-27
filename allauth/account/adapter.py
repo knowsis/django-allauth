@@ -1,3 +1,6 @@
+from __future__ import unicode_literals
+
+import re
 import warnings
 import json
 
@@ -21,6 +24,11 @@ from ..utils import (import_attribute, get_user_model,
                      resolve_url)
 
 from . import app_settings
+
+# Don't bother turning this into a setting, as changing this also
+# requires changing the accompanying form error message. So if you
+# need to change any of this, simply override clean_username().
+USERNAME_REGEX = re.compile(r'^[\w.@+-]+$', re.UNICODE)
 
 
 class DefaultAccountAdapter(object):
@@ -49,7 +57,7 @@ class DefaultAccountAdapter(object):
         prefix = app_settings.EMAIL_SUBJECT_PREFIX
         if prefix is None:
             site = Site.objects.get_current()
-            prefix = u"[{name}] ".format(name=site.name)
+            prefix = "[{name}] ".format(name=site.name)
         return prefix + force_text(subject)
 
     def render_mail(self, template_prefix, email, context):
@@ -160,10 +168,13 @@ class DefaultAccountAdapter(object):
         if app_settings.USER_MODEL_USERNAME_FIELD:
             user_username(user,
                           username
-                          or generate_unique_username([first_name,
-                                                       last_name,
-                                                       email,
-                                                       'user']))
+                          or self.generate_unique_username([first_name,
+                                                            last_name,
+                                                            email,
+                                                            'user']))
+
+    def generate_unique_username(self, txts, regex=None):
+        return generate_unique_username(txts, regex)
 
     def save_user(self, request, user, form, commit=True):
         """
@@ -179,8 +190,10 @@ class DefaultAccountAdapter(object):
         username = data.get('username')
         user_email(user, email)
         user_username(user, username)
-        user_field(user, 'first_name', first_name or '')
-        user_field(user, 'last_name', last_name or '')
+        if first_name:
+            user_field(user, 'first_name', first_name)
+        if last_name:
+            user_field(user, 'last_name', last_name)
         if 'password1' in data:
             user.set_password(data["password1"])
         else:
@@ -197,8 +210,6 @@ class DefaultAccountAdapter(object):
         Validates the username. You can hook into this if you want to
         (dynamically) restrict what usernames can be chosen.
         """
-        from django.contrib.auth.forms import UserCreationForm
-        USERNAME_REGEX = UserCreationForm().fields['username'].regex
         if not USERNAME_REGEX.match(username):
             raise forms.ValidationError(_("Usernames can only contain "
                                           "letters, digits and @/./+/-/_."))
@@ -239,13 +250,15 @@ class DefaultAccountAdapter(object):
         return password
 
     def add_message(self, request, level, message_template,
-                    message_context={}, extra_tags=''):
+                    message_context=None, extra_tags=''):
         """
         Wrapper of `django.contrib.messages.add_message`, that reads
         the message text from a template.
         """
         if 'django.contrib.messages' in settings.INSTALLED_APPS:
             try:
+                if message_context is None:
+                    message_context = {}
                 message = render_to_string(message_template,
                                            message_context).strip()
                 if message:
@@ -256,6 +269,8 @@ class DefaultAccountAdapter(object):
 
     def ajax_response(self, request, response, redirect_to=None, form=None):
         data = {}
+        status = response.status_code
+
         if redirect_to:
             status = 200
             data['location'] = redirect_to
@@ -291,6 +306,16 @@ class DefaultAccountAdapter(object):
     def set_password(self, user, password):
         user.set_password(password)
         user.save()
+
+    def get_user_search_fields(self):
+        user = get_user_model()()
+        return filter(lambda a: a and hasattr(user, a),
+                      [app_settings.USER_MODEL_USERNAME_FIELD,
+                       'first_name', 'last_name', 'email'])
+
+    def is_safe_url(self, url):
+        from django.utils.http import is_safe_url
+        return is_safe_url(url)
 
 
 def get_adapter():

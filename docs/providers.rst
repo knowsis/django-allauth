@@ -23,6 +23,8 @@ For local development, use the following::
 
     http://127.0.0.1:8000/accounts/twitter/login/callback/
 
+
+
 Amazon
 ------
 
@@ -72,20 +74,23 @@ The following Facebook settings are available::
 
     SOCIALACCOUNT_PROVIDERS = \
         {'facebook':
-           {'SCOPE': ['email', 'publish_stream'],
+           {'SCOPE': ['email', 'public_profile', 'user_friends'],
             'AUTH_PARAMS': {'auth_type': 'reauthenticate'},
             'METHOD': 'oauth2',
             'LOCALE_FUNC': 'path.to.callable',
-            'VERIFIED_EMAIL': False}}
+            'VERIFIED_EMAIL': False,
+            'VERSION': 'v2.3'}}
 
-METHOD
+METHOD:
     Either `js_sdk` or `oauth2`
 
-SCOPE
+SCOPE:
     By default, `email` scope is required depending whether or not
     `SOCIALACCOUNT_QUERY_EMAIL` is enabled.
+    Except permissions for `email`, `public_profile` and `user_friends`, apps using other permissions require review by Facebook.
+    You can look at `Permissions with Facebook Login <https://developers.facebook.com/docs/facebook-login/permissions>`_.
 
-AUTH_PARAMS
+AUTH_PARAMS:
     Use `AUTH_PARAMS` to pass along other parameters to the `FB.login`
     JS SDK call.
 
@@ -111,13 +116,32 @@ VERIFIED_EMAIL:
     verified. Do know that by setting this to `True` you are
     introducing a security risk.
 
+VERSION:
+    The Facebook Graph API version to use.
+
 App registration (get your key and secret here)
-    https://developers.facebook.com/apps
+    A key and secret key can be obtained by creating an app
+    https://developers.facebook.com/apps .
+    After registration you will need to make it available to the public.
+    In order to do that your app first has to be reviewed by Facebook, see
+    https://developers.facebook.com/docs/apps/review.
 
 Development callback URL
     Leave your App Domains empty and put in the section `Website with Facebook
     Login` put this as your Site URL: `http://localhost:8000`
 
+
+Firefox Accounts
+----------------
+
+The Firefox Accounts provider is currently limited to Mozilla relying services
+but there is the intention to, in the future, allow third-party services to
+delegate authentication. There is no committed timeline for this.
+
+The provider is OAuth2 based. More info:
+    https://developer.mozilla.org/en-US/Firefox_Accounts
+
+Note: This is not the same as the Mozilla Persona provider below.
 
 GitHub
 ------
@@ -132,23 +156,41 @@ Google
 The Google provider is OAuth2 based. More info:
 `http://code.google.com/apis/accounts/docs/OAuth2.html#Registering`.
 
-You can specify the scope to use as follows::
+
+App registration
+****************
+Create a google app to obtain a key and secret through the developer console:
+        https://console.developers.google.com/
+
+After you create a project you will have to create a "Client ID" and fill in some project details for the consent form that will be presented to the client.
+
+Under "APIs & auth" go to "Credentials" and create a new Client ID. Probably you will want a "Web application" Client ID. Provide your domain name or test domain name in "Authorized JavaScript origins". Finally fill in "http://127.0.0.1:8000/accounts/google/login/callback/" in the "Authorized redirect URI" field. You can fill multiple URLs, one for each test domain.After creating the Client ID you will find all details for the Django configuration on this page.
+
+Users that login using the app will be presented a consent form. For this to work additional information is required. Under "APIs & auth" go to "Consent screen" and atleast provide an email and product name.
+
+
+Django configuration
+********************
+The app credentials are configured for your Django installation via the admin interface. Create a new socialapp through `/admin/socialaccount/socialapp/`.
+
+Fill in the form as follows:
+
+* Provider, "Google"
+* Name, your pick, suggest "Google"
+* Client id, is called "Client ID" by Google
+* Secret key, is called "Client secret" by Google
+* Key, is not needed, leave blank.
+
+
+Optionally, you can specify the scope to use as follows::
 
     SOCIALACCOUNT_PROVIDERS = \
         { 'google':
-            { 'SCOPE': ['https://www.googleapis.com/auth/userinfo.profile'],
+            { 'SCOPE': ['profile', 'email'],
               'AUTH_PARAMS': { 'access_type': 'online' } }}
 
 By default, `profile` scope is required, and optionally `email` scope
 depending on whether or not `SOCIALACCOUNT_QUERY_EMAIL` is enabled.
-
-App registration (get your key and secret here)
-        https://code.google.com/apis/console/
-
-Development callback URL
-        Make sure you list a redirect uri of the form
-        `http://example.com/accounts/google/login/callback/`. You can fill
-        multiple URLs, one for each test domain.
 
 
 LinkedIn
@@ -190,13 +232,23 @@ App registration (get your key and secret here)
 Development callback URL
         Leave the OAuth redirect URL empty.
 
+
+Odnoklassniki
+-------------
+
+Register your OAuth2 app here: http://apiok.ru/wiki/pages/viewpage.action?pageId=42476486
+
+Development callback URL
+    http://example.com/accounts/odnoklassniki/login/callback/
+
+
 OpenID
 ------
 
 The OpenID provider does not require any settings per se. However, a
 typical OpenID login page presents the user with a predefined list of
-OpenID providers and allows the user to input his own OpenID identity
-URL in case his provider is not listed by default. The list of
+OpenID providers and allows the user to input their own OpenID identity
+URL in case their provider is not listed by default. The list of
 providers displayed by the builtin templates can be configured as
 follows::
 
@@ -276,6 +328,20 @@ SoundCloud
 SoundCloud allows you to choose between OAuth1 and OAuth2.  Choose the
 latter.
 
+Development callback URL
+    http://example.com/accounts/soundcloud/login/callback/
+
+Evernote
+----------
+
+Register your OAuth2 application at `https://dev.evernote.com/doc/articles/authentication.php`.
+
+    SOCIALACCOUNT_PROVIDERS = {
+        'evernote': {
+            'EVERNOTE_HOSTNAME': 'evernote.com'  # defaults to sandbox.evernote.com
+        }
+    }
+
 
 Stack Exchange
 --------------
@@ -300,6 +366,53 @@ Twitch
 ------
 Register your OAuth2 app over at
 `http://www.twitch.tv/kraken/oauth2/clients/new`.
+
+Twitter
+-------
+
+You will need to create a Twitter app and configure the Twitter provider for your Django application via the admin interface.
+
+App registration
+****************
+
+To register an app on Twitter you will need a Twitter account after which you can create a new app via::
+
+    https://apps.twitter.com/app/new
+
+In the app creation form fill in the development callback URL::
+
+    http://127.0.0.1:8000
+
+Twitter won't allow using http://localhost:8000.
+
+For production use a callback URL such as::
+
+   http://{{yourdomain}}.com
+   
+To allow user's to login without authorizing each session select "Allow this application to be used to Sign in with Twitter" under the application's "Settings" tab.
+
+App database configuration through admin
+****************************************
+
+The second part of setting up the Twitter provider requires you to configure your Django application.
+Configuration is done by creating a Socialapp object in the admin.
+Add a social app on the admin page::
+
+    /admin/socialaccount/socialapp/
+
+
+Use the twitter keys tab of your application to fill in the form. It's located::
+
+    https://apps.twitter.com/app/{{yourappid}}/keys
+
+The configuration is as follows:
+
+* Provider, "Twitter"
+* Name, your pick, suggest "Twitter"
+* Client id, is called "Consumer Key (API Key)" on Twitter
+* Secret key, is called "Consumer Secret (API Secret)" on Twitter
+* Key, is not needed, leave blank
+
 
 Vimeo
 -----

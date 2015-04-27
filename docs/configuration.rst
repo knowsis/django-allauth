@@ -9,7 +9,8 @@ ACCOUNT_ADAPTER (="allauth.account.adapter.DefaultAccountAdapter")
 
 ACCOUNT_AUTHENTICATION_METHOD (="username" | "email" | "username_email")
   Specifies the login method to use -- whether the user logs in by
-  entering his username, e-mail address, or either one of both.
+  entering their username, e-mail address, or either one of both.
+  Setting this to "email" requires ACCOUNT_EMAIL_REQUIRED=True
 
 ACCOUNT_CONFIRM_EMAIL_ON_GET (=False)
   Determines whether or not an e-mail address is automatically confirmed
@@ -69,7 +70,7 @@ ACCOUNT_SIGNUP_FORM_CLASS (=None)
   method, where user represents the newly signed up user.
 
 ACCOUNT_SIGNUP_PASSWORD_VERIFICATION (=True)
-  When signing up, let the user type in his password twice to avoid typo's.
+  When signing up, let the user type in their password twice to avoid typo's.
 
 ACCOUNT_UNIQUE_EMAIL (=True)
   Enforce uniqueness of e-mail addresses.
@@ -106,9 +107,13 @@ ACCOUNT_PASSWORD_MIN_LENGTH (=6)
   An integer specifying the minimum password length.
 
 ACCOUNT_LOGIN_ON_EMAIL_CONFIRMATION (=True)
-  The default behaviour is to automatically log the user in once he confirms
-  his email address. By changing this setting to False he will not be logged
-  in, but redirected to the ACCOUNT_EMAIL_CONFIRMATION_ANONYMOUS_REDIRECT_URL
+  The default behaviour is to automatically log users in once they confirm
+  their email address. Note however that this only works when confirming
+  the email address **immediately after signing up**, assuming users
+  didn't close their browser or used some sort of private browsing mode.
+
+  By changing this setting to `False` they will not be logged in, but
+  redirected to the `ACCOUNT_EMAIL_CONFIRMATION_ANONYMOUS_REDIRECT_URL`
 
 ACCOUNT_SESSION_REMEMBER (=None)
   Controls the life time of the session. Set to `None` to ask the user
