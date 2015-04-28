@@ -105,13 +105,6 @@ def perform_login(request, user, email_verification,
     email is essential (during signup), or if it can be skipped (e.g. in
     case email verification is optional and we are only logging in).
     """
-    # Local users are stopped due to form validation checking
-    # is_active, yet, adapter methods could toy with is_active in a
-    # `user_signed_up` signal. Furthermore, social users should be
-    # stopped anyway.
-    if not user.is_active:
-        return HttpResponseRedirect(reverse('account_inactive'))
-
     from .models import EmailAddress
     has_verified_email = EmailAddress.objects.filter(user=user,
                                                      verified=True).exists()
@@ -126,6 +119,14 @@ def perform_login(request, user, email_verification,
             send_email_confirmation(request, user, signup=signup)
             return HttpResponseRedirect(
                 reverse('account_email_verification_sent'))
+
+    # Local users are stopped due to form validation checking
+    # is_active, yet, adapter methods could toy with is_active in a
+    # `user_signed_up` signal. Furthermore, social users should be
+    # stopped anyway.
+    if not user.is_active:
+        return HttpResponseRedirect(reverse('account_inactive'))
+
     try:
         get_adapter().login(request, user)
         response = HttpResponseRedirect(
