@@ -1,4 +1,3 @@
-from allauth.nonrel import non_rel
 from django.core.urlresolvers import reverse, reverse_lazy
 from django.contrib.sites.models import Site
 from django.http import (HttpResponseRedirect, Http404,
@@ -18,7 +17,7 @@ from ..utils import get_form_class, get_request_param
 from .utils import (get_next_redirect_url, complete_signup,
                     get_login_redirect_url, perform_login,
                     passthrough_next_redirect_url)
-from .forms import AddEmailForm, ChangePasswordForm, NonRelResetPasswordForm
+from .forms import AddEmailForm, ChangePasswordForm
 from .forms import LoginForm, ResetPasswordKeyForm
 from .forms import ResetPasswordForm, SetPasswordForm, SignupForm, UserTokenForm
 from .utils import sync_user_email_addresses

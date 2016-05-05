@@ -2,7 +2,7 @@
 try:
     from django.forms import Field
     from djangotoolbox.fields import ListField, DictField, AbstractIterableField
-    from .widgets import SerializedObjectWidget
+    from allauth.widgets import SerializedObjectWidget
 
     class ListFieldWithForm(ListField):
         def formfield(self, **kwargs):

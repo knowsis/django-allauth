@@ -6,8 +6,6 @@ from ..utils import get_user_model
 from .app_settings import AuthenticationMethod
 from . import app_settings
 
-User = get_user_model()
-
 
 class AuthenticationBackend(ModelBackend):
 
@@ -58,4 +56,3 @@ class AuthenticationBackend(ModelBackend):
                 if user.check_password(credentials["password"]):
                     return user
         return None
-

@@ -1,11 +1,10 @@
-from allauth.nonrel import ListFieldWithForm
 from allauth.socialaccount import providers
 from allauth.socialaccount.models import SocialAppManager
+from allauth.storage.django_nonrel.nonrel import ListFieldWithForm
 from django.contrib.sites.models import Site
 from django.db import models
 from django.db.models import ForeignKey
 from django.utils.encoding import python_2_unicode_compatible
-
 from django.utils.translation import ugettext_lazy as _
 
 

@@ -1,31 +1,24 @@
 from __future__ import absolute_import
-from allauth.nonrel import non_rel
 
 import warnings
-
 from django import forms
-from django.core.urlresolvers import reverse
-from django.core import exceptions
-from django.utils.translation import pgettext, ugettext_lazy as _, ugettext
-
 from django.contrib.auth import authenticate
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.models import Site
-
-from django.shortcuts import get_object_or_404
-
-from ..utils import (email_address_exists,
-                     set_form_field_order,
-                     build_absolute_uri,
-                     get_username_max_length)
-
+from django.core import exceptions
+from django.core.urlresolvers import reverse
+from django.utils.translation import pgettext, ugettext_lazy as _, ugettext
+from . import app_settings
+from .adapter import get_adapter
+from .app_settings import AuthenticationMethod
 from .models import EmailAddress
 from .utils import (perform_login, setup_user_email, url_str_to_user_pk,
                     user_username, user_pk_to_url_str, filter_users_by_email,
                     get_user_model)
-from .app_settings import AuthenticationMethod
-from . import app_settings
-from .adapter import get_adapter
+from ..utils import (email_address_exists,
+                     set_form_field_order,
+                     build_absolute_uri,
+                     get_username_max_length)
 
 try:
     from importlib import import_module
@@ -429,7 +422,7 @@ class ResetPasswordForm(forms.Form):
 
             # send the password reset email
             path = reverse("account_reset_password_from_key",
-                           kwargs=dict(uid=user_pk_to_url_str(user),
+                           kwargs=dict(uidb36=user_pk_to_url_str(user),
                                        key=temp_key))
             url = build_absolute_uri(
                 request, path,
@@ -483,9 +476,6 @@ class UserTokenForm(forms.Form):
     }
 
     def _get_user(self, uidb36):
-        if non_rel:
-            return get_object_or_404(User, id=uidb36)
-
         User = get_user_model()
         try:
             pk = url_str_to_user_pk(uidb36)

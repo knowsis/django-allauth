@@ -6,8 +6,6 @@ from allauth.account.adapter import get_adapter
 
 from .models import SocialApp, SocialAccount, SocialToken
 
-from ..nonrel import non_rel
-
 
 class SocialAppForm(forms.ModelForm):
     class Meta:
