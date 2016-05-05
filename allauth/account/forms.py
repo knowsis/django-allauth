@@ -446,19 +446,6 @@ class ResetPasswordForm(forms.Form):
         return self.cleaned_data["email"]
 
 
-class NonRelResetPasswordForm(ResetPasswordForm):
-
-    def clean_email(self):
-        email = self.cleaned_data["email"]
-        email = get_adapter().clean_email(email)
-        self.users = User.objects.filter(email__iexact=email)
-
-        if not self.users.exists():
-            raise forms.ValidationError(_("The e-mail address is not assigned"
-                                          " to any user account"))
-        return self.cleaned_data["email"]
-
-
 class ResetPasswordKeyForm(forms.Form):
 
     password1 = SetPasswordField(label=_("New Password"))

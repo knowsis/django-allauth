@@ -524,7 +524,7 @@ password_set = login_required(PasswordSetView.as_view())
 
 class PasswordResetView(AjaxCapableProcessFormViewMixin, FormView):
     template_name = "account/password_reset.html"
-    form_class = NonRelResetPasswordForm if non_rel else ResetPasswordForm
+    form_class = ResetPasswordForm
     success_url = reverse_lazy("account_reset_password_done")
 
     def get_form_class(self):

@@ -23,8 +23,7 @@ class SocialAppForm(forms.ModelForm):
 class SocialAppAdmin(admin.ModelAdmin):
     form = SocialAppForm
     list_display = ('name', 'provider',)
-    if not non_rel:
-        filter_horizontal = ('sites',)
+    filter_horizontal = ('sites',)
 
 
 class SocialAccountAdmin(admin.ModelAdmin):
