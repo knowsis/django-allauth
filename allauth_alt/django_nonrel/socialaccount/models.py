@@ -1,6 +1,6 @@
 from allauth.socialaccount import providers
 from allauth.socialaccount.models import SocialAppManager
-from allauth.storage.django_nonrel.nonrel import ListFieldWithForm
+from allauth_alt.django_nonrel.nonrel import ListFieldWithForm
 from django.contrib.sites.models import Site
 from django.db import models
 from django.db.models import ForeignKey

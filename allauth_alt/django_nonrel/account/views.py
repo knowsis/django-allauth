@@ -1,7 +1,7 @@
 from allauth.account import app_settings
 from allauth.account.views import AjaxCapableProcessFormViewMixin
-from allauth.storage.django_nonrel.account.forms import ResetPasswordForm
 from allauth.utils import get_form_class
+from allauth_alt.django_nonrel.account.forms import ResetPasswordForm
 from django.core.urlresolvers import reverse_lazy
 from django.views.generic.edit import FormView
 
