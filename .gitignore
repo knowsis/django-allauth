@@ -26,7 +26,7 @@ pep8.txt
 *.tmp
 virtualenv
 .DS_Store
-
+.env
 *.prefs
 *.mo
 .env
