@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-class NonRelAuthenticationBackend(AuthenticationBackend):
+class AuthenticationBackend(AuthenticationBackend):
 
     def _authenticate_by_email(self, **credentials):
         # Even though allauth will pass along `email`, other apps may

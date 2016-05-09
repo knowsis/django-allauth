@@ -140,7 +140,7 @@ INSTALLED_APPS = (
 
 AUTHENTICATION_BACKENDS = (
     "django.contrib.auth.backends.ModelBackend",
-    "allauth.alt_storage.django_nonrel.account.auth_backends.AuthenticationBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 )
 
 STATIC_ROOT = '/tmp/'  # Dummy

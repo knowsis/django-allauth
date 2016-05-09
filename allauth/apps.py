@@ -1,6 +1,10 @@
 from importlib import import_module
+from logging import getLogger
 
 from django.apps import AppConfig
+
+
+logger = getLogger(__name__)
 
 
 class AllauthConfig(AppConfig):
@@ -9,10 +13,15 @@ class AllauthConfig(AppConfig):
     def __init__(self, app_name, app_module):
         super(AllauthConfig, self).__init__(app_name, app_module)
 
-        patch_nonrel()
+    def ready(self):
+        from django.conf import settings
+        db_engine = settings.DATABASES['default']['ENGINE']
+
+        if db_engine == 'django_mongodb_engine':
+            patch_for_nonrel()
 
 
-def patch_nonrel():
+def patch_for_nonrel():
     for p in patches:
         patch(*p)
 
@@ -27,7 +36,7 @@ def patch(old, new):
     old_module, old_item = split_mod(old)
     new_module, new_item = split_mod(new)
 
-    print('patching {0} with {1}'.format(old, new))
+    logger.info('patching {0} with {1}'.format(old, new))
 
     old_module = import_module(old_module)
     new_module = import_module(new_module)
@@ -40,5 +49,7 @@ patches = [
      'allauth.alt_storage.django_nonrel.account.forms.ResetPasswordForm'),
     ('allauth.account.views.PasswordResetView',
      'allauth.alt_storage.django_nonrel.account.views.PasswordResetView'),
+    ('allauth.account.auth_backends.AuthenticationBackend',
+     'allauth.alt_storage.django_nonrel.account.auth_backends.AuthenticationBackend'),
 ]
 
