@@ -1,0 +1,3 @@
+https://github.com/knowsis/django/tarball/nonrel-1.9
+https://github.com/knowsis/djangotoolbox/tarball/nonrel-1.9
+https://github.com/knowsis/mongodb-engine/tarball/nonrel-1.9
