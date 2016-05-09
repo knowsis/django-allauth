@@ -17,3 +17,6 @@ __version__ = '.'.join(map(str, VERSION[:3])) + ('-{}{}'.format(
 __author__ = 'Raymond Penners'
 __license__ = 'MIT'
 __copyright__ = 'Copyright 2010-2016 Raymond Penners and contributors'
+
+
+default_app_config = 'allauth.apps.AllauthConfig'
