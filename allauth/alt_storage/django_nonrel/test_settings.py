@@ -1,18 +1,37 @@
 # -*- coding: utf-8 -*-
 
 import django
+from django.test.runner import DiscoverRunner
 
 SECRET_KEY = 'psst'
 SITE_ID = 1
 
+
+class NoDbTestRunner(DiscoverRunner):
+    """ A test runner to test without database creation """
+
+    def setup_databases(self, **kwargs):
+        """ Override the database creation defined in parent class """
+        pass
+
+    def teardown_databases(self, old_config, **kwargs):
+        """ Override the database teardown defined in parent class """
+        pass
+
+
+TEST_RUNNER = 'allauth.alt_storage.django_nonrel.test_settings.NoDbTestRunner'
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:',
-        'USER': '',
-        'PASSWORD': '',
+        'ENGINE': 'django_mongodb_engine',
+        'NAME': '',
         'HOST': '',
         'PORT': '',
+        'USER': '',
+        'PASSWORD': '',
+        'SUPPORTS_TRANSACTIONS': False,
+        'OPTIONS': {
+        }
     }
 }
 
@@ -62,8 +81,6 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.admin',
-
-    'allauth_alt.django_nonrel',
 
     'allauth',
     'allauth.account',
@@ -123,7 +140,7 @@ INSTALLED_APPS = (
 
 AUTHENTICATION_BACKENDS = (
     "django.contrib.auth.backends.ModelBackend",
-    "allauth_alt.django_nonrel.account.auth_backends.AuthenticationBackend",
+    "allauth.alt_storage.django_nonrel.account.auth_backends.AuthenticationBackend",
 )
 
 STATIC_ROOT = '/tmp/'  # Dummy
